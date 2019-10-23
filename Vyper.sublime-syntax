@@ -41,7 +41,17 @@ contexts:
     - include: line-expressions
 
   line-statements:
+    - include: imports
     - include: decorators
+    - match: \b(assert)\b
+      scope: keyword.other.assert.python
+    - match: \b(return)\b
+      scope: keyword.control.flow.return.python
+    - match: \b(break)\b
+      scope: keyword.control.flow.break.python
+    - match: \b(continue)\b
+      scope: keyword.control.flow.continue.python
+    - match: \b(pass)\b
 
   block-statements:
     - match: \bif\b
@@ -274,7 +284,7 @@ contexts:
       pop: true
 
   classes:
-    - match: '^\s*(class|contract)\b'
+    - match: '^\s*(class|contract|struct)\b'
       captures:
         1: storage.type.class.vyper
       push:
@@ -393,6 +403,92 @@ contexts:
     - include: comments
     - match: (?=\S)
       pop: true
+
+  imports:
+    - match: \b(import)\b
+      scope: keyword.control.import.python
+      push:
+        - meta_scope: meta.statement.import.python
+        - include: line-continuation-or-pop
+        - match: ','
+          scope: punctuation.separator.import-list.python
+        - match: \.
+          scope: invalid.illegal.unexpected-relative-import.python
+        - include: import-alias
+        - include: qualified-name
+        - match: (?=\S)
+          pop: true
+    - match: \b(from)\b
+      scope: keyword.control.import.from.python
+      push:
+        - meta_scope: meta.statement.import.python
+        - meta_content_scope: meta.import-source.python
+        - include: line-continuation-or-pop
+        - match: \b(import)\b
+          scope: keyword.control.import.python
+          set:
+            - meta_scope: meta.statement.import.python
+            - include: line-continuation-or-pop
+            - match: ' *(\()'
+              captures:
+                1: punctuation.section.import-list.begin.python
+              set:
+                - meta_scope: meta.statement.import.python
+                - include: comments
+                - match: \)
+                  scope: punctuation.section.import-list.end.python
+                  pop: true
+                - include: import-name-list
+                - match: (?=\S)
+                  pop: true
+            - match: ''
+              set:
+                - meta_scope: meta.statement.import.python
+                - include: line-continuation-or-pop
+                - include: import-name-list
+                - match: (?=\S)
+                  pop: true
+            - match: (?=\S)
+              pop: true
+        - include: import-from-name
+        - match: (?=\S)
+          pop: true
+
+  import-name-list:
+    - match: ','
+      scope: punctuation.separator.import-list.python
+    - include: import-alias
+    - include: name
+    - match: \*
+      scope: constant.language.import-all.python
+    - match: \S+
+      scope: invalid.illegal.name.import.python
+
+  import-alias:
+    - match: \b(as)\b
+      scope: keyword.control.import.as.python
+
+  import-from-name:
+    - match: \.+
+      scope: meta.import-path.python keyword.control.import.relative.python
+    - match: (?={{path}})
+      push:
+        - meta_scope: meta.import-path.python
+        - match: '{{illegal_names}}\b'
+          scope: invalid.illegal.name.python
+        - match: '{{identifier}}'
+          scope: meta.import-name.python
+        - match: \s*(\.) *(?:({{illegal_names}}\b)|({{identifier}}))
+          captures:
+            1: punctuation.accessor.dot.python
+            2: invalid.illegal.name.python
+            3: meta.import-name.python
+        - match: \ *(\. *\S+) # matches and consumes the remainder of "abc.123" or "abc.+"
+          captures:
+            1: invalid.illegal.name.python
+          pop: true
+        - match: ''
+          pop: true
 
   decorators:
     - match: ^\s*(?=@)
@@ -556,14 +652,14 @@ contexts:
           as_unitless_number|as_wei_value|bitwise_and|bitwise_not|bitwise_or|
           bitwise_xor|blockhash|ceil|concat|convert|create_with_code_of|ecadd|
           ecmul|ecrecover|extract32|floor|keccak256|len|max|method_id|min|
-          raw_call|RLPList|sha3|shift|slice|uint256_addmod|uint256_mulmod|
+          raw_call|RLPList|sha3|shift|slice|uint256_addmod|uint256_mulmod|sha256
           event|log
         )\b
       scope: support.function.builtin.vyper
   builtin-types:
     - match: |-
         (?x)\b(
-          address|bool|decimal|bytes32|int128|uint256|bytes
+          address|bool|decimal|bytes32|int128|uint256|bytes|string
         )\b
       scope: support.type.vyper
   name:
